@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 )
 
+type application struct {
+	logger *slog.Logger
+}
 type neuteredFileSystem struct {
 	fs http.FileSystem
 }
@@ -39,16 +42,23 @@ func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
 func main() {
 	addr := flag.String("addr", ":4000", "HTTP nerwork address")
 	flag.Parse()
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	app := &application{
+		logger: logger,
+	}
+
 	mux := http.NewServeMux()
 	fileServe := http.FileServer(neuteredFileSystem{http.Dir("./ui/static/")})
 
 	mux.Handle("GET /static", http.NotFoundHandler())
 	mux.Handle("GET /static/", http.StripPrefix("/static", fileServe))
-	mux.HandleFunc("GET /{$}", home)
-	mux.HandleFunc("GET /snippet/view/{id}", snippetView)
-	mux.HandleFunc("GET /snippet/create", snippetCreate)
-	mux.HandleFunc("POST /snippet/create", snippetCreatePost)
+
+	mux.HandleFunc("GET /{$}", app.home)
+	mux.HandleFunc("GET /snippet/view/{id}", app.snippetView)
+	mux.HandleFunc("GET /snippet/create", app.snippetCreate)
+	mux.HandleFunc("POST /snippet/create", app.snippetCreatePost)
+
 	logger.Info("starting server on", "addr", *addr)
 	err := http.ListenAndServe(*addr, mux)
 	logger.Error(err.Error())
