@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"html/template"
 	"log"
 	"log/slog"
 	"net/http"
@@ -11,12 +12,15 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Zaki-Zak/Snippet-Go-Box/internal/models"
 	_ "github.com/go-sql-driver/mysql" // New import
 	"github.com/joho/godotenv"
 )
 
 type application struct {
-	logger *slog.Logger
+	logger        *slog.Logger
+	snippets      *models.SnippetModel
+	templateCache map[string]*template.Template
 }
 type neuteredFileSystem struct {
 	fs http.FileSystem
@@ -84,16 +88,24 @@ func main() {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	app := &application{
-		logger: logger,
-	}
-
 	db, err := openDB(*dsn)
 	if err != nil {
 		logger.Error("failed to open database", "dbError", err)
 		os.Exit(1)
 	}
 	defer db.Close()
+	// Initialize a new template cache...
+	templateCache, err := newTemplateCache()
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
+	// And add it to the application dependencies.
+	app := &application{
+		logger:        logger,
+		snippets:      &models.SnippetModel{DB: db},
+		templateCache: templateCache,
+	}
 
 	logger.Info("starting server on", "addr", *addr)
 	err = http.ListenAndServe(*addr, app.routes())

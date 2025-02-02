@@ -1,8 +1,12 @@
 package main
 
-import "net/http"
+import (
+	"net/http"
 
-func (app *application) routes() *http.ServeMux {
+	"github.com/justinas/alice"
+)
+
+func (app *application) routes() http.Handler {
 	mux := http.NewServeMux()
 	fileServe := http.FileServer(neuteredFileSystem{http.Dir("./ui/static/")})
 
@@ -13,5 +17,7 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("GET /snippet/view/{id}", app.snippetView)
 	mux.HandleFunc("GET /snippet/create", app.snippetCreate)
 	mux.HandleFunc("POST /snippet/create", app.snippetCreatePost)
-	return mux
+	// Creating a Middleware chain
+	standard := alice.New(app.recoverPanic, app.logRequest, commonHeaders)
+	return standard.Then(mux)
 }
