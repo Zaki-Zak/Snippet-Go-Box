@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -82,36 +83,43 @@ func getDefaultDSN() string {
 }
 
 func main() {
+	// INFO: env variables and cli variables.
 	addr := flag.String("addr", ":4000", "HTTP nerwork address")
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
 	dsn := flag.String("dsn", getDefaultDSN(), "MySQL data source name")
-
 	flag.Parse()
 
+	// INFO: Structural logger.
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
+	// INFO: connection to the DB.
 	db, err := openDB(*dsn)
 	if err != nil {
 		logger.Error("failed to open database", "dbError", err)
 		os.Exit(1)
 	}
 	defer db.Close()
-	// Initialize a new template cache...
+
+	// INFO: Initialize a new template cache...
 	templateCache, err := newTemplateCache()
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
+
+	// INFO: form decoder init.
 	formDecoder := form.NewDecoder()
 
+	// INFO: creating a sessionManager.
 	sessionManager := scs.New()
 	sessionManager.Store = mysqlstore.New(db)
 	sessionManager.Lifetime = 12 * time.Hour
+	sessionManager.Cookie.Secure = true
 
-	// And add it to the application dependencies.
+	// INFO: adding dependencies to the app struct.
 	app := &application{
 		logger:         logger,
 		snippets:       &models.SnippetModel{DB: db},
@@ -119,9 +127,26 @@ func main() {
 		formDecoder:    formDecoder,
 		sessionManager: sessionManager,
 	}
+	// INFO: custom tls config
+	tlsConfig := &tls.Config{
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+	}
+
+	// INFO: Initializing a new http.Server struct.
+	srv := &http.Server{
+		Addr:         *addr,
+		Handler:      app.routes(),
+		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
+		TLSConfig:    tlsConfig,
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  5 * time.Second,
+		writeTimeout: 10 * time.Second,
+	}
 
 	logger.Info("starting server on", "addr", *addr)
-	err = http.ListenAndServe(*addr, app.routes())
+
+	// INFO: calling the ListenAndServe() on the new struct.
+	err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
 	logger.Error("server error", "error", err)
 	os.Exit(1)
 }
