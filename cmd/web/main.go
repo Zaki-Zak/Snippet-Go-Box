@@ -23,8 +23,8 @@ import (
 
 type application struct {
 	logger         *slog.Logger
-	snippets       *models.SnippetModel
-	users          *models.UserModel
+	snippets       models.SnippetModelInterface
+	users          models.UserModelInterface
 	templateCache  map[string]*template.Template
 	formDecoder    *form.Decoder
 	sessionManager *scs.SessionManager
@@ -62,11 +62,11 @@ func openDB(dsn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to datebase: %w", err)
 	}
-	// Set connection pool settings
+	// INFO: Set connection pool settings
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(25)
 	db.SetConnMaxIdleTime(5 * time.Minute)
-	// Verify the connction
+	// INFO: Verify the connction
 	err = db.Ping()
 	if err != nil {
 		db.Close()
