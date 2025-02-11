@@ -155,21 +155,21 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-
 	snippet, err := app.snippets.Get(id)
 	if err != nil {
 		if errors.Is(err, models.ErrNoRecord) {
-		} else {
 			http.NotFound(w, r)
+		} else {
 			app.serverError(w, r, err)
 		}
 		return
 	}
 
+	flash := app.sessionManager.PopString(r.Context(), "flash")
 	data := app.newTemplateData(r)
 	data.Snippet = snippet
 
-	// INFO: Use the new render helper.
+	data.Flash = flash
 	app.render(w, r, http.StatusOK, "view.tmpl", data)
 }
 
