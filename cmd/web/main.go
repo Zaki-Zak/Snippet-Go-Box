@@ -22,6 +22,7 @@ import (
 )
 
 type application struct {
+	debug          bool
 	logger         *slog.Logger
 	snippets       models.SnippetModelInterface
 	users          models.UserModelInterface
@@ -91,6 +92,8 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 	dsn := flag.String("dsn", getDefaultDSN(), "MySQL data source name")
+
+	debug := flag.Bool("debug", false, "Enable debug mode")
 	flag.Parse()
 
 	// INFO: Structural logger.
@@ -122,6 +125,7 @@ func main() {
 
 	// INFO: adding dependencies to the app struct.
 	app := &application{
+		debug:          *debug,
 		logger:         logger,
 		snippets:       &models.SnippetModel{DB: db},
 		users:          &models.UserModel{DB: db},
